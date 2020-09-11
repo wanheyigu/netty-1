@@ -131,11 +131,12 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     private volatile int ioRatio = 50;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
-
+    
     NioEventLoop(NioEventLoopGroup parent, Executor executor, SelectorProvider selectorProvider,
                  SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler,
                  EventLoopTaskQueueFactory queueFactory) {
-        super(parent, executor, false, newTaskQueue(queueFactory), newTaskQueue(queueFactory),
+        //进入父类创建，继续追踪
+    	super(parent, executor, false, newTaskQueue(queueFactory), newTaskQueue(queueFactory),
                 rejectedExecutionHandler);
         this.provider = ObjectUtil.checkNotNull(selectorProvider, "selectorProvider");
         this.selectStrategy = ObjectUtil.checkNotNull(strategy, "selectStrategy");
@@ -431,9 +432,16 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
     }
 
+    /*
+     * 执行新任务
+     */
     @Override
     protected void run() {
         int selectCnt = 0;
+        /*
+         * 死循环
+         * 用于实现轮询SELECT
+         */
         for (;;) {
             try {
                 int strategy;
@@ -481,10 +489,12 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 if (ioRatio == 100) {
                     try {
                         if (strategy > 0) {
+                        	//处理当前轮询到的IO事件
                             processSelectedKeys();
                         }
                     } finally {
                         // Ensure we always run tasks.
+                    	//处理任务队列(追踪)
                         ranTasks = runAllTasks();
                     }
                 } else if (strategy > 0) {

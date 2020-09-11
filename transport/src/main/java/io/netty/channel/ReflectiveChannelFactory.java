@@ -16,6 +16,7 @@
 
 package io.netty.channel;
 
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
@@ -31,6 +32,7 @@ public class ReflectiveChannelFactory<T extends Channel> implements ChannelFacto
     public ReflectiveChannelFactory(Class<? extends T> clazz) {
         ObjectUtil.checkNotNull(clazz, "clazz");
         try {
+        	
             this.constructor = clazz.getConstructor();
         } catch (NoSuchMethodException e) {
             throw new IllegalArgumentException("Class " + StringUtil.simpleClassName(clazz) +
@@ -41,6 +43,14 @@ public class ReflectiveChannelFactory<T extends Channel> implements ChannelFacto
     @Override
     public T newChannel() {
         try {
+        	/* 3.1.2
+        	 * 通过反射构造器对象调用无参构造器，获取channel；
+        	 * -constructor构造器对象，是在编写启动服务端时配置的.channel(NioServerSocketChannel.class)
+        	 *  那么此处即NioServerSocketChannel的构造器对象；
+        	 * 此处代码向下追踪即进入了java反射代码内容。
+        	 * 
+        	 * 5.1 无参构造器中创建了pipeline,那么追踪[NioServerSocketChannel]
+        	 */
             return constructor.newInstance();
         } catch (Throwable t) {
             throw new ChannelException("Unable to create Channel from class " + constructor.getDeclaringClass(), t);

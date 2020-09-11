@@ -31,7 +31,8 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-/**
+
+/** NioEventLoopGroup入口
  * {@link MultithreadEventLoopGroup} implementations which is used for NIO {@link Selector} based {@link Channel}s.
  */
 public class NioEventLoopGroup extends MultithreadEventLoopGroup {
@@ -39,6 +40,9 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
     /**
      * Create a new instance using the default number of threads, the default {@link ThreadFactory} and
      * the {@link SelectorProvider} which is returned by {@link SelectorProvider#provider()}.
+     * 
+     * 1.1 无参构造器调用有参构造器
+     * 		不带参数代表出入参数值为0
      */
     public NioEventLoopGroup() {
         this(0);
@@ -49,6 +53,10 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
      * {@link SelectorProvider} which is returned by {@link SelectorProvider#provider()}.
      */
     public NioEventLoopGroup(int nThreads) {
+    	/* 1.2 调用两个参数的构造器
+    	 *   -参数代表指定的NioEventLoop个数，传入0代表为设定，后面创建过程中会配置值
+    	 *   -当前Executor为null
+    	 */
         this(nThreads, (Executor) null);
     }
 
@@ -69,7 +77,12 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
     }
 
     public NioEventLoopGroup(int nThreads, Executor executor) {
-        this(nThreads, executor, SelectorProvider.provider());
+        /* 1.3 继续调用三个参数的构造器
+         *     -前两个参数同1.2，分别为0与null；
+         *     -第三个参数是通过方法生成一个Selector
+         * 
+         */
+    	this(nThreads, executor, SelectorProvider.provider());
     }
 
     /**
@@ -88,11 +101,19 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
 
     public NioEventLoopGroup(
             int nThreads, Executor executor, final SelectorProvider selectorProvider) {
+    	/* 1.4 继续调用四个参数的构造器
+    	 *    -前三个参数为：0、null、Selector
+    	 *    -第四个参数是通过DefaultSelectStrategyFactory(Selector策略工厂)生成Select策略实例
+    	 */
         this(nThreads, executor, selectorProvider, DefaultSelectStrategyFactory.INSTANCE);
     }
 
     public NioEventLoopGroup(int nThreads, Executor executor, final SelectorProvider selectorProvider,
                              final SelectStrategyFactory selectStrategyFactory) {
+    	/* 1.5 调用父类五个参数的构造器
+    	 *    -前四个参数为：0、null、Selector、策略实例
+    	 *    -第五个参数是拒绝策略
+    	 */
         super(nThreads, executor, selectorProvider, selectStrategyFactory, RejectedExecutionHandlers.reject());
     }
 
@@ -139,9 +160,13 @@ public class NioEventLoopGroup extends MultithreadEventLoopGroup {
         }
     }
 
+    /* 
+     * 创建NioEventLoop
+     */
     @Override
     protected EventLoop newChild(Executor executor, Object... args) throws Exception {
         EventLoopTaskQueueFactory queueFactory = args.length == 4 ? (EventLoopTaskQueueFactory) args[3] : null;
+        //追踪创建
         return new NioEventLoop(this, executor, (SelectorProvider) args[0],
             ((SelectStrategyFactory) args[1]).newSelectStrategy(), (RejectedExecutionHandler) args[2], queueFactory);
     }

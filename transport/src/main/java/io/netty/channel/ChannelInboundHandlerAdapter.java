@@ -30,6 +30,18 @@ import io.netty.channel.ChannelHandlerMask.Skip;
  * method returns automatically. If you are looking for a {@link ChannelInboundHandler} implementation that
  * releases the received messages automatically, please see {@link SimpleChannelInboundHandler}.
  * </p>
+ * ChannelInboundHandlerAdapter中都是重写父类的方法：
+ * 注意：
+ *    1.其重写方法后应用fire...(),fire代表触发，但注意其是触发下一个结点的当前方法的执行(即下一个处理器)
+ *       例如：@Skip
+			 @Override
+			 public void channelActive(ChannelHandlerContext ctx) throws Exception {
+			     ctx.fireChannelActive();     //触发下一个结点的channelActive()方法的执行
+			 }
+ * 
+ *    2.关于@Sikp：
+ *         如果用户继承ChannelInboundHandlerAdapter，那么就会继承其方法，@Sikp代表只要继承者不重写
+ *         其中的某个方法，该方法就不会被执行。
  */
 public class ChannelInboundHandlerAdapter extends ChannelHandlerAdapter implements ChannelInboundHandler {
 

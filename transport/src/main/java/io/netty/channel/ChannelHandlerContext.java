@@ -86,16 +86,25 @@ import java.nio.channels.Channels;
  * what fundamental differences they have, how they flow in a  pipeline,  and how to handle
  * the operation in your application.
  */
+/* 继承关系：
+ * AttributeMap：channel属性
+ * ChannelInboundInvoker:入栈接口调用[实际是调用ChannelInboundHandler处理器]
+ * ChannelOutboundInvoker:出栈接口调用[实际是调用ChannelOutboundHandler处理器]
+ * 
+ * 关于出入栈可以简单理解：即ChannelInbound内的方法都是触发回调的方法，ChannelOutbound中的方法都是需要主动调用执行；
+ */
 public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvoker, ChannelOutboundInvoker {
 
     /**
      * Return the {@link Channel} which is bound to the {@link ChannelHandlerContext}.
      */
+	//节点所属channel通道
     Channel channel();
 
     /**
      * Returns the {@link EventExecutor} which is used to execute an arbitrary task.
      */
+    //执行结点(处理器)的EventLoop
     EventExecutor executor();
 
     /**
@@ -103,10 +112,15 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
      * was added to the {@link ChannelPipeline}. This name can also be used to access the registered
      * {@link ChannelHandler} from the {@link ChannelPipeline}.
      */
+    //节点名称[pipeline.addLast("name",handler)]
     String name();
 
     /**
      * The {@link ChannelHandler} that is bound this {@link ChannelHandlerContext}.
+     */
+    /*
+     * 节点的处理器[pipeline.addLast("name",handler)]
+     * ChannelHandlerContext本身就是用来封装handler处理器的作用
      */
     ChannelHandler handler();
 
@@ -115,8 +129,12 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
      * from the {@link ChannelPipeline}. Note that this method is only meant to be called from with in the
      * {@link EventLoop}.
      */
+    //判断是否从pipeline中删除了
     boolean isRemoved();
 
+    /* 继承自父接口的方法
+     * 以下fire...()代表触发方法。
+     */
     @Override
     ChannelHandlerContext fireChannelRegistered();
 

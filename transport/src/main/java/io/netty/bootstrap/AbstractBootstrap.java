@@ -241,6 +241,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * Create a new {@link Channel} and bind it.
+     * 创建一个新的通道并为其绑定端口；
+     * 
+     * 1.netty服务端启动的入口，在绑定端口的时候创建Channel；
      */
     public ChannelFuture bind(int inetPort) {
         return bind(new InetSocketAddress(inetPort));
@@ -262,14 +265,26 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * Create a new {@link Channel} and bind it.
+     * 2.继续执行绑定，验证group与channelFactory，验证localAddress不为空
      */
     public ChannelFuture bind(SocketAddress localAddress) {
-        validate();
+        validate();//验证group与channelFactory是否为空
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
+    /**
+     * 3.执行Channel初始化与注册
+     * @param localAddress
+     * @return
+     */
     private ChannelFuture doBind(final SocketAddress localAddress) {
+    	/*
+    	 * 3.1初始化与注册Channel，返回一个异步实例
+    	 * -初始化Channel
+    	 * -将Channel注册到selector
+    	 */
         final ChannelFuture regFuture = initAndRegister();
+        //3.2通过异步实例获取Channel
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
             return regFuture;
@@ -278,6 +293,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
             ChannelPromise promise = channel.newPromise();
+            /*
+             * 为channel绑定端口
+             */
             doBind0(regFuture, channel, localAddress, promise);
             return promise;
         } else {
@@ -307,7 +325,15 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+        	
+        	/*3.1.1 通过channelFactory工厂获取一个新的channel，实际是
+        	 * 创建了一个JDK的Channel，然后为其双创建了一个id、channelPiple、config；
+        	 * 注意此处的channelFactory是一个反射工厂。*/
             channel = channelFactory.newChannel();
+            
+            /*3.1.2初始化 channel
+             * 
+             */
             init(channel);
         } catch (Throwable t) {
             if (channel != null) {
@@ -320,6 +346,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        /* 3.2 将Channel注册到selector
+         * 
+         */
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {
@@ -341,6 +370,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return regFuture;
     }
 
+    /**
+     * 3.1.3 初始化channel抽象方法
+     *   服务端追踪ServerBootstrap的实现；
+     * @param channel
+     * @throws Exception
+     */
     abstract void init(Channel channel) throws Exception;
 
     private static void doBind0(
@@ -349,10 +384,17 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
         // This method is invoked before channelRegistered() is triggered.  Give user handlers a chance to set up
         // the pipeline in its channelRegistered() implementation.
-        channel.eventLoop().execute(new Runnable() {
+        /* channel.eventLoop().execute(new Runnable()
+         * channel与eventLoop为绑定关系，此时代表开始执行；
+         * 追踪.execute[SingleThreadEventExecutor]
+         * 
+         * 开始执行
+         */
+    	channel.eventLoop().execute(new Runnable() {
             @Override
             public void run() {
                 if (regFuture.isSuccess()) {
+                	//绑定端口
                     channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 } else {
                     promise.setFailure(regFuture.cause());
@@ -379,9 +421,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return group;
     }
 
-    /**
+    /** 3.2.1创建配置对象
      * Returns the {@link AbstractBootstrapConfig} object that can be used to obtain the current config
      * of the bootstrap.
+     * 返回可用于获取当前配置的{@link AbstractBootstrapConfig}对象引导程序;
      */
     public abstract AbstractBootstrapConfig<B, C> config();
 
@@ -391,10 +434,11 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         }
     }
 
+    //option集合
     final Map<ChannelOption<?>, Object> options0() {
         return options;
     }
-
+    //attr集合
     final Map<AttributeKey<?>, Object> attrs0() {
         return attrs;
     }

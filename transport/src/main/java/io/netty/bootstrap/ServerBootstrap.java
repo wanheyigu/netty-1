@@ -127,9 +127,18 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return this;
     }
 
+    /*
+     * 将option、attr、childOption、childAttr，及新创建的一个专门用于处理连接请求的处理器初始化到channel中。
+     */
     @Override
     void init(Channel channel) {
+    	/* 3.1.4 
+    	 *   将设置的option存入newOptionsArray配置给channel
+    	 */
         setChannelOptions(channel, newOptionsArray(), logger);
+        /* 3.1.5 
+    	 *   将设置的attr配置给channel
+    	 */
         setAttributes(channel, attrs0().entrySet().toArray(EMPTY_ATTRIBUTE_ARRAY));
 
         ChannelPipeline p = channel.pipeline();
@@ -279,6 +288,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return copiedMap(childAttrs);
     }
 
+    /*
+     * 3.2.2 创建config配置类
+     */
     @Override
     public final ServerBootstrapConfig config() {
         return config;

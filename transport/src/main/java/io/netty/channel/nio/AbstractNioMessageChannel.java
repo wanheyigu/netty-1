@@ -37,6 +37,7 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
 
     /**
      * @see AbstractNioChannel#AbstractNioChannel(Channel, SelectableChannel, int)
+     * 追踪pipeline创建...
      */
     protected AbstractNioMessageChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
         super(parent, ch, readInterestOp);

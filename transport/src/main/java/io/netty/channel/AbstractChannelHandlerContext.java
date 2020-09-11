@@ -61,6 +61,11 @@ import static io.netty.channel.ChannelHandlerMask.mask;
 abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, ResourceLeakHint {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannelHandlerContext.class);
+    /* 结点中的两个"指针"
+     * next指向当前结点的下一个结点；
+     * prev指向当前结点的上一个结点；
+     * 
+     */
     volatile AbstractChannelHandlerContext next;
     volatile AbstractChannelHandlerContext prev;
 
@@ -912,6 +917,7 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
     }
 
     final boolean setAddComplete() {
+    	//
         for (;;) {
             int oldState = handlerState;
             if (oldState == REMOVE_COMPLETE) {
@@ -920,8 +926,15 @@ abstract class AbstractChannelHandlerContext implements ChannelHandlerContext, R
             // Ensure we never update when the handlerState is REMOVE_COMPLETE already.
             // oldState is usually ADD_PENDING but can also be REMOVE_COMPLETE when an EventExecutor is used that is not
             // exposing ordering guarantees.
+            // 确保处理状态为REMOVE_COMPLETE时不会添加。
+            // oldState通常是ADD_PENDING，但也可以是REMOVE_COMPLETE，当EventExecutor被使用，而不是
+            // 暴露顺序保证。
+            /*
+             * 通过cas方法改变节点状态
+             */
             if (HANDLER_STATE_UPDATER.compareAndSet(this, oldState, ADD_COMPLETE)) {
-                return true;
+                //添加成功即改变状态成功就结束
+            	return true;
             }
         }
     }

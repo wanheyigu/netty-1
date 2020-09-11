@@ -47,13 +47,24 @@ public final class ThreadExecutorMap {
     /**
      * Decorate the given {@link Executor} and ensure {@link #currentExecutor()} will return {@code eventExecutor}
      * when called from within the {@link Runnable} during execution.
+     * 
+     * 修饰传入的ThreadPerTaskExecutor实例{@link Executor}，并确保{@link #currentExecutor()}将返回{@code eventExecutor}
+     * 当在执行期间从{@link Runnable}中调用时。
      */
     public static Executor apply(final Executor executor, final EventExecutor eventExecutor) {
-        ObjectUtil.checkNotNull(executor, "executor");
+        /* 判断ThreadPerTaskExecutor和SingleThreadEventExecutor都不为空*/
+    	ObjectUtil.checkNotNull(executor, "executor");
         ObjectUtil.checkNotNull(eventExecutor, "eventExecutor");
+        /*
+         * 创建并绑定线程
+         */
         return new Executor() {
+        	/* 此方法在   时调用
+        	 * 
+        	 */
             @Override
             public void execute(final Runnable command) {
+            	/*追踪execute()方法[ThreadPerTaskExecutor]*/
                 executor.execute(apply(command, eventExecutor));
             }
         };

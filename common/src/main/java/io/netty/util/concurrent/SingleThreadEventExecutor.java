@@ -163,10 +163,19 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     protected SingleThreadEventExecutor(EventExecutorGroup parent, Executor executor,
                                         boolean addTaskWakesUp, Queue<Runnable> taskQueue,
-                                        RejectedExecutionHandler rejectedHandler) {
-        super(parent);
+                                       RejectedExecutionHandler rejectedHandler) {
+    	//开始分析 
+    	super(parent);
         this.addTaskWakesUp = addTaskWakesUp;
         this.maxPendingTasks = DEFAULT_MAX_PENDING_EXECUTOR_TASKS;
+        
+        /* 1.9 由此处开始：创建线程
+         *     Netty为每个Channel分配了一个EventLoop，用于处理用户连接请求、
+         *     对用户请求的处理等所有事件。EventLoop本身只是一个线程驱动，在其
+         *     生命周期内只会绑定一个线程，让该线程处理一个Channel的所有IO事件。
+         * -传入executor 当前值为ThreadPerTaskExecutor实例；
+         * 追踪执行apply()方法；
+         */
         this.executor = ThreadExecutorMap.apply(executor, this);
         this.taskQueue = ObjectUtil.checkNotNull(taskQueue, "taskQueue");
         this.rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, "rejectedHandler");
@@ -371,7 +380,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         assert inEventLoop();
         boolean fetchedAll;
         boolean ranAtLeastOne = false;
-
+        /*
+         * 处理任务队列中的任务
+         *    [目前队列中有一个绑定端口的任务，在此处理]
+         */
         do {
             fetchedAll = fetchFromScheduledTaskQueue();
             if (runAllTasksFrom(taskQueue)) {
@@ -556,6 +568,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
     }
 
+    /* 
+     * 比较当前主线程与成员变量记录的线程是否相等；
+     * 成员变量记录的线程是Excutor创建的任务线程，首次进入还未创建所有为空；
+     * 返回false；
+     */
     @Override
     public boolean inEventLoop(Thread thread) {
         return thread == this.thread;
@@ -812,8 +829,12 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         return isTerminated();
     }
 
+    /*
+     * 执行task任务：当前task任务为绑定端口
+     */
     @Override
     public void execute(Runnable task) {
+    	//task不为空
         ObjectUtil.checkNotNull(task, "task");
         execute(task, !(task instanceof LazyRunnable) && wakesUpForTask(task));
     }
@@ -823,10 +844,17 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         execute(ObjectUtil.checkNotNull(task, "task"), false);
     }
 
+    //继续执行
     private void execute(Runnable task, boolean immediate) {
+    	/*
+    	 * 首次运行inEventLoop的返回值为false
+    	 */
         boolean inEventLoop = inEventLoop();
+        //将任务添加到任务队列中
         addTask(task);
+        //返回值为false，取非为true
         if (!inEventLoop) {
+        	//启动线程
             startThread();
             if (isShutdown()) {
                 boolean reject = false;
@@ -938,12 +966,14 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     // ScheduledExecutorService implementation
 
     private static final long SCHEDULE_PURGE_INTERVAL = TimeUnit.SECONDS.toNanos(1);
-
+    //线程启动
     private void startThread() {
         if (state == ST_NOT_STARTED) {
+        	//通过CAS方法改变线程状态为started：即如果当前的STATE_UPDATER状态与ST_NOT_STARTED是相同的，就修改为ST_STARTED状态
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
                 boolean success = false;
                 try {
+                	//开启执行线程
                     doStartThread();
                     success = true;
                 } finally {
@@ -974,10 +1004,25 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     private void doStartThread() {
+    	/* 
+    	 * assert断言：如果thread为空就继续执行，如果为false就不执行；
+    	 * 类似于：
+    	 * if(thread == null){
+    	 *   执行逻辑；
+    	 *   }
+    	 * else{ return }
+    	 */
         assert thread == null;
+        /* executor为EventLoop
+         * 执行一个新的任务(绑定端口的任务已经放入了任务队列)
+         */
         executor.execute(new Runnable() {
             @Override
             public void run() {
+            	/*
+            	 * 创建inEventLoop()中比较为null的线程；
+            	 * 
+            	 */
                 thread = Thread.currentThread();
                 if (interrupted) {
                     thread.interrupt();
@@ -986,6 +1031,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                	/*
+                	 * 执行新任务
+                	 *    追踪run()[NioEventLoop]
+                	 */
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

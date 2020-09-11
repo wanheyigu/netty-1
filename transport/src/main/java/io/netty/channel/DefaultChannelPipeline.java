@@ -86,6 +86,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     /**
      * Set to {@code true} once the {@link AbstractChannel} is registered.Once set to {@code true} the value will never
      * change.
+     * 追踪pipeline创建过程...
      */
     private boolean registered;
 
@@ -93,10 +94,24 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         this.channel = ObjectUtil.checkNotNull(channel, "channel");
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);
-
+        /* 在创建pipeline时就进行了初始化
+         *   -创建了tail尾节点，创建了head头节点
+         * 
+         * -传入的this即为pipeline；
+         * -tail和head本质是继承自AbstractChannelHandlerContext
+         *    那么其本身就带有next和prev属性。
+         * -实现了implements ChannelInboundHandler接口(入栈处理器)
+         *     接口内部是回调触发方法
+         */
         tail = new TailContext(this);
         head = new HeadContext(this);
-
+        
+        /*
+         * 并且：
+         * -让头节点的下一个指针指向尾节点；
+         * -让尾节点的上一个指针指向头节点；
+         * 
+         */
         head.next = tail;
         tail.prev = head;
     }
@@ -199,10 +214,22 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+        	/*
+        	 * 1.检查当前处理器能否被共享(具体是判断类上面是否出现了@Sharable注解)
+        	 *     如果有@Sharable代表可以被多个处理器共享(此处不可以出现共享)
+        	 * 如果不能被共享，并且没有被添加，则执行添加操作。
+        	 */
             checkMultiplicity(handler);
-
+            /*
+             * 2.创建一个结点
+             *    filterName如果不指定名称，就用处理器的简单类名+#0，
+             *    而且要判断名称是否重复，不重复返回成功，如果重复给定新名称+#1，递归调用直到成功。
+             */
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            /*
+             * 向链表中添加结点，追踪
+             */
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
@@ -220,10 +247,16 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return this;
             }
         }
+        /*
+         * 触发HandlerAdded回调方法执行
+         */
         callHandlerAdded0(newCtx);
         return this;
     }
 
+    /* 添加处理器到链表
+     * 链表操作：更头和尾的指向
+     */
     private void addLast0(AbstractChannelHandlerContext newCtx) {
         AbstractChannelHandlerContext prev = tail.prev;
         newCtx.prev = prev;
@@ -365,6 +398,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return addLast(null, handler);
     }
 
+    /*
+     * 向pipeline中添加处理器
+     */
     @Override
     public final ChannelPipeline addLast(ChannelHandler... handlers) {
         return addLast(null, handlers);
@@ -374,10 +410,16 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup executor, ChannelHandler... handlers) {
         ObjectUtil.checkNotNull(handlers, "handlers");
 
+        /*
+         * 添加数组，遍历
+         */
         for (ChannelHandler h: handlers) {
             if (h == null) {
                 break;
             }
+            /*
+             * 添加处理器，追踪
+             */
             addLast(executor, null, h);
         }
 
@@ -412,8 +454,13 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return StringUtil.simpleClassName(handlerType) + "#0";
     }
 
+    /*
+     * 删除处理器结点：
+     *   追踪getContextOrDie(handler)方法，通过此方法最终获取了处理器对应的ctx
+     */
     @Override
     public final ChannelPipeline remove(ChannelHandler handler) {
+    	//获取到ctx后，从pipeline中移除，追踪remove(getContextOrDie(handler))
         remove(getContextOrDie(handler));
         return this;
     }
@@ -453,6 +500,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         assert ctx != head && ctx != tail;
 
         synchronized (this) {
+        	//此处应用原子性方法删除(4.1.3版本时还是remove0())，继续追踪
             atomicRemoveFromHandlerList(ctx);
 
             // If the registered is false it means that the channel was not registered on an eventloop yet.
@@ -474,12 +522,15 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return ctx;
             }
         }
+        //调用HandlerRemoved()回调方法执行
         callHandlerRemoved0(ctx);
         return ctx;
     }
 
     /**
      * Method is synchronized to make the handler removal from the double linked list atomic.
+     * 同步方法，以使从双链表删除处理程序具有原子性。
+     * 操作链表(更改头尾指向)，删除ctx
      */
     private synchronized void atomicRemoveFromHandlerList(AbstractChannelHandlerContext ctx) {
         AbstractChannelHandlerContext prev = ctx.prev;
@@ -713,6 +764,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return context0(ObjectUtil.checkNotNull(name, "name"));
     }
 
+    /*
+     * 将处理器封装为结点
+     */
     @Override
     public final ChannelHandlerContext context(ChannelHandler handler) {
         ObjectUtil.checkNotNull(handler, "handler");
@@ -720,10 +774,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         AbstractChannelHandlerContext ctx = head.next;
         for (;;) {
 
+        	//对比pipeline头结点后的结点是否为传入的处理器
+        	//没有返回null
             if (ctx == null) {
                 return null;
             }
-
+            //有就返回当前结点
             if (ctx.handler() == handler) {
                 return ctx;
             }
@@ -1077,10 +1133,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     private AbstractChannelHandlerContext getContextOrDie(ChannelHandler handler) {
+    	//将处理器封装为结点，追踪context(handler)
         AbstractChannelHandlerContext ctx = (AbstractChannelHandlerContext) context(handler);
+        //没有当前处理器代表的结点抛出异常
         if (ctx == null) {
             throw new NoSuchElementException(handler.getClass().getName());
-        } else {
+        } else {//有处理器代表的结点返回该结点
             return ctx;
         }
     }
@@ -1246,6 +1304,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         TailContext(DefaultChannelPipeline pipeline) {
             super(pipeline, null, TAIL_NAME, TailContext.class);
+            //添加节点到pipeline
             setAddComplete();
         }
 

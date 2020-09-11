@@ -77,7 +77,14 @@ final class ChannelHandlerMask {
         // Try to obtain the mask from the cache first. If this fails calculate it and put it in the cache for fast
         // lookup in the future.
         Map<Class<? extends ChannelHandler>, Integer> cache = MASKS.get();
+        /*
+         * mask标记使用：
+         *     非常巧妙的运用标记来决定是否跳过方法的执行；
+         * 无论继承ChannelInboundHandler或ChanneloutboundHandler
+         * 继承方法是否执行取决于mask；(其内部判断是否有@skip注解，有就跳过，没有就执行)
+         */
         Integer mask = cache.get(clazz);
+        
         if (mask == null) {
             mask = mask0(clazz);
             cache.put(clazz, mask);

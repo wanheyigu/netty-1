@@ -55,11 +55,18 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      * @param args              arguments which will passed to each {@link #newChild(Executor, Object...)} call
      */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor, Object... args) {
+    	/* 1.7 继续调用构造器
+    	 *    参数值：16、null
+    	 *    参数三：DefaultEventExecutorChooserFactory.INSTANCE获取一个默认的事件执行器选择器工厂实例
+    	 * 
+    	 */
         this(nThreads, executor, DefaultEventExecutorChooserFactory.INSTANCE, args);
     }
 
     /**
      * Create a new instance.
+     * 
+     * 1.8 开始创建NioEventLoopGroup
      *
      * @param nThreads          the number of threads that will be used by this instance.
      * @param executor          the Executor to use, or {@code null} if the default should be used.
@@ -68,19 +75,32 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
      */
     protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
                                             EventExecutorChooserFactory chooserFactory, Object... args) {
-        if (nThreads <= 0) {
+    	//1.8.1-当前nThreads为16，向下
+    	if (nThreads <= 0) { 
             throw new IllegalArgumentException(String.format("nThreads: %d (expected: > 0)", nThreads));
         }
-
+    	//1.8.2-当前executor为空进入
         if (executor == null) {
+        	/* 创建一个ThreadPerTaskExecutor实例给executor
+        	 * -ThreadPerTaskExecutor是为每个任务创建线程的执行器
+        	 * 因此executor的作用是为每任务创建线程，创建好的线程与EnventLoop绑定，一个EnventLoop绑定一个线程。
+        	 * 
+        	 * -追踪newDefaultThreadFactory()；
+        	 */
             executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
-
+        /* 1.8.3创建一个EventExecutor(即EventLoop)数组实例children，
+         *      数组长度即为指定长度nThreads即16；
+         */
         children = new EventExecutor[nThreads];
 
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+            	/* 1.8.4 创建NioEventLoop
+            	 *       循环16次创建16个NioEventLoop，每创建一个放入数组一个；
+            	 * 
+            	 */
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {

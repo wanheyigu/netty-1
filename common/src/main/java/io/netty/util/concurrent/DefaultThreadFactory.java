@@ -66,17 +66,19 @@ public class DefaultThreadFactory implements ThreadFactory {
 
     public static String toPoolName(Class<?> poolType) {
         ObjectUtil.checkNotNull(poolType, "poolType");
-
+        //poolName是获取的poolType的简单类名(NioEventLoopGroup)，创建线程是的名称即从此处获取；
         String poolName = StringUtil.simpleClassName(poolType);
         switch (poolName.length()) {
-            case 0:
+            case 0: //长度为0返回unknown
                 return "unknown";
-            case 1:
+            case 1: //长度为1,返回其字母小写
                 return poolName.toLowerCase(Locale.US);
-            default:
+            default://默认执行，长度大于1
+            	//判断第一个字符是否大写，在判断第二个字母是否为小写，如果都为true
                 if (Character.isUpperCase(poolName.charAt(0)) && Character.isLowerCase(poolName.charAt(1))) {
-                    return Character.toLowerCase(poolName.charAt(0)) + poolName.substring(1);
-                } else {
+                    //将第一个字母变为小写然后拼接后续字母(即把首字母变小写)
+                	return Character.toLowerCase(poolName.charAt(0)) + poolName.substring(1);
+                } else {//如首字母为小写直接返回
                     return poolName;
                 }
         }
@@ -89,7 +91,10 @@ public class DefaultThreadFactory implements ThreadFactory {
             throw new IllegalArgumentException(
                     "priority: " + priority + " (expected: Thread.MIN_PRIORITY <= priority <= Thread.MAX_PRIORITY)");
         }
-
+        /* poolId为new AtomicInteger()，初始值为0
+         * prefix等于简单名称(nioEventLoopGroup)+"-"+(poolId+1)+"-"
+         * "nioEventLoopGroup-1-"即为创建NioEventLoop的名称
+         */
         prefix = poolName + '-' + poolId.incrementAndGet() + '-';
         this.daemon = daemon;
         this.priority = priority;
@@ -101,8 +106,15 @@ public class DefaultThreadFactory implements ThreadFactory {
                 Thread.currentThread().getThreadGroup() : System.getSecurityManager().getThreadGroup());
     }
 
+    /*
+     * 创建线程
+     */
     @Override
     public Thread newThread(Runnable r) {
+    	/*
+    	 * -prefix：线程名称
+    	 * -nextId.incrementAndGet()：自增的线程ID
+    	 */
         Thread t = newThread(FastThreadLocalRunnable.wrap(r), prefix + nextId.incrementAndGet());
         try {
             if (t.isDaemon() != daemon) {
